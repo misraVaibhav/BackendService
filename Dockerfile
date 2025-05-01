@@ -1,32 +1,30 @@
-# Use an official Maven image to build the app
-FROM maven:3.8.1-openjdk-21 AS builder
+# ---------- Build Stage ----------
+FROM openjdk:21-jdk-slim AS build
 
-# Set the working directory
 WORKDIR /app
 
-# Copy the pom.xml and the source code to the container
+COPY mvnw .
+COPY .mvn .mvn
 COPY pom.xml .
 
-# Download the dependencies (this will cache the dependencies layer)
-RUN mvn dependency:go-offline
+# Pre-download dependencies
+RUN ./mvnw dependency:go-offline
 
-# Copy the rest of the application source code
-COPY src /app/src
+# Copy the source code
+COPY src src
 
-# Package the app (this will create the target JAR file)
-RUN mvn clean package -DskipTests
+# Package the application
+RUN ./mvnw clean package -DskipTests
 
-# Now, build the actual runtime image
-FROM openjdk:21-slim
 
-# Set the working directory
+# ---------- Runtime Stage ----------
+FROM openjdk:21-jdk-slim
+
 WORKDIR /app
 
-# Copy the JAR file from the builder stage to the runtime stage
-COPY --from=builder /app/target/*.jar /app/application.jar
+# Copy only the built JAR from the build stage
+COPY --from=build /app/target/*.jar app.jar
 
-# Expose the port your app runs on
 EXPOSE 8080
 
-# Command to run the application
-ENTRYPOINT ["java", "-jar", "/app/application.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
